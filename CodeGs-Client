@@ -1,0 +1,49 @@
+// ==================== CLIENT WEB APP ====================
+// This file serves the UI and calls the library (AVMS_Lib)
+
+function doGet() {
+  return HtmlService.createTemplateFromFile('Index').evaluate()
+    .setTitle('Voucher System')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+// ==================== WRAPPER FUNCTIONS ====================
+// These forward every call to the library.
+
+function setupSheets() { return AVMS_Lib.setupSheets(); }
+function getInfoData() { return AVMS_Lib.getInfoData(); }
+function updateInfoData(infoData) { return AVMS_Lib.updateInfoData(infoData); }
+function getCompanyInfo() { return AVMS_Lib.getCompanyInfo(); }
+function getParties() { return AVMS_Lib.getParties(); }
+function addParty(partyData) { return AVMS_Lib.addParty(partyData); }
+function deleteParty(rowNum) { return AVMS_Lib.deleteParty(rowNum); }
+function getPartyOutstanding(filterType) { return AVMS_Lib.getPartyOutstanding(filterType); }
+function getPartyTransactions(partyName, limit) { return AVMS_Lib.getPartyTransactions(partyName, limit); }
+function generatePartyReport(partyData) { return AVMS_Lib.generatePartyReport(partyData); }
+function emailPartyReport(email, reportData) { return AVMS_Lib.emailPartyReport(email, reportData); }
+function createVoucher(formData) { return AVMS_Lib.createVoucher(formData); }
+function postVoucherToSheets() { return AVMS_Lib.postVoucherToSheets(); }
+function getFinancialSummary() { return AVMS_Lib.getFinancialSummary(); }
+function deleteVoucher(voucherNumber) { return AVMS_Lib.deleteVoucher(voucherNumber); }
+function searchVoucher(voucherNumber) { return AVMS_Lib.searchVoucher(voucherNumber); }
+function generatePDF(voucherData) { return AVMS_Lib.generatePDF(voucherData); }
+function getPrintHTML(voucherData) { return AVMS_Lib.getPrintHTML(voucherData); }
+function sendEmailWithPDF(email, voucherData) { return AVMS_Lib.sendEmailWithPDF(email, voucherData); }
+function createBackup() { return AVMS_Lib.createBackup(); }
+function emailBackup(fileId, email) { return AVMS_Lib.emailBackup(fileId, email); }
+function exportData(startDateStr, endDateStr, format) { return AVMS_Lib.exportData(startDateStr, endDateStr, format); }
+function generateFinancialReportPDF(startDateStr, endDateStr) { return AVMS_Lib.generateFinancialReportPDF(startDateStr, endDateStr); }
+function emailFinancialReport(email, startDateStr, endDateStr) { return AVMS_Lib.emailFinancialReport(email, startDateStr, endDateStr); }
+function getCurrentVoucher() { return AVMS_Lib.getCurrentVoucher(); }
+function clearCurrentVoucher() { return AVMS_Lib.clearCurrentVoucher(); }
+function getSheetUrl() { return AVMS_Lib.getSheetUrl(); }
+function forceDriveWritePermission() { return AVMS_Lib.forceDriveWritePermission(); }
+
+// License wrappers
+function hasAnyLicense() { return AVMS_Lib.hasAnyLicense(); }
+function validateLicenseKey(key) { return AVMS_Lib.validateLicenseKey(key); }
+
+// Optional admin wrappers (if you want to manage keys from client script editor)
+function setLicenseKey(key, expiryDate) { return AVMS_Lib.setLicenseKey(key, expiryDate); }
+function removeLicenseKey(key) { return AVMS_Lib.removeLicenseKey(key); }
+function listLicenseKeys() { return AVMS_Lib.listLicenseKeys(); }
