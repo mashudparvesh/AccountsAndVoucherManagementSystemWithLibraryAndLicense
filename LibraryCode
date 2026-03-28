@@ -404,13 +404,13 @@ function createPartyReportHTML(data, transactions) {
   var printDate = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd-MM-yyyy hh:mm a");
 
   var rows = transactions.map(function(t) {
-    return '  <tr>' +
-      '<td>' + escapeHtml(t.voucherNo) + '</td>' +
-      '<td>' + escapeHtml(t.date) + '</td>' +
-      '<td>' + escapeHtml(t.type) + ' (' + escapeHtml(t.category) + ')</td>' +
-      '<td>' + escapeHtml(t.particulars) + '</td>' +
+    return '   <tr>' +
+      '     <td>' + escapeHtml(t.voucherNo) + '</td>' +
+      '     <td>' + escapeHtml(t.date) + '</td>' +
+      '     <td>' + escapeHtml(t.type) + ' (' + escapeHtml(t.category) + ')</td>' +
+      '     <td>' + escapeHtml(t.particulars) + '</td>' +
       '<td style="text-align: right; white-space: nowrap;">৳ ' + t.amount.toFixed(2) + '</td>' +
-      '</tr>';
+      '   </tr>';
   }).join('');
 
   return '<!DOCTYPE html>\n' +
@@ -896,11 +896,11 @@ function createPDFTemplate(data) {
   var amountInWords = convertToWords(total);
 
   var itemsRows = items.map(function(item) {
-    return '<tr>' +
-      '<td>' + escapeHtml(item.sl) + '</td>' +
-      '<td>' + escapeHtml(item.particulars) + '</td>' +
+    return '   <tr>' +
+      '     <td>' + escapeHtml(item.sl) + '</td>' +
+      '     <td>' + escapeHtml(item.particulars) + '</td>' +
       '<td style="text-align: right; white-space: nowrap;">৳ ' + parseFloat(item.amount).toFixed(2) + '</td>' +
-      '</tr>';
+      '   </tr>';
   }).join('');
 
   var formattedDate = formatDateForPDF(voucher.date);
@@ -1501,34 +1501,51 @@ function forceDriveWritePermission() {
   testFile.setTrashed(true);
 }
 
-// ==================== CENTRAL LICENSE FUNCTIONS ====================
-function getLicenseData() {
+
+// ==================== LICENSE SYSTEM (SCRIPT PROPERTIES) ====================
+function getLicenseKeys() {
   try {
-    var ssLicense = SpreadsheetApp.openById(LICENSE_SPREADSHEET_ID);
-    var sheet = ssLicense.getSheetByName('Licenses');
-    if (!sheet) return {};
-    var data = sheet.getDataRange().getValues();
-    var licenses = {};
-    for (var i = 1; i < data.length; i++) {
-      var key = data[i][0];
-      var expiry = data[i][1];
-      if (key && expiry) {
-        licenses[key] = expiry;
-      }
-    }
-    return licenses;
+    var stored = PropertiesService.getScriptProperties().getProperty('LICENSES');
+    if (!stored) return {};
+    return JSON.parse(stored);
   } catch (e) {
     return {};
   }
 }
 
+function saveLicenseKeys(keys) {
+  PropertiesService.getScriptProperties().setProperty('LICENSES', JSON.stringify(keys));
+}
+
+function setLicenseKey(key, expiryDate) {
+  var keys = getLicenseKeys();
+  keys[key] = expiryDate; // expiryDate format: YYYY-MM-DD
+  saveLicenseKeys(keys);
+  return 'License added/updated: ' + key + ' expires on ' + expiryDate;
+}
+
+function removeLicenseKey(key) {
+  var keys = getLicenseKeys();
+  if (keys[key]) {
+    delete keys[key];
+    saveLicenseKeys(keys);
+    return 'License removed: ' + key;
+  } else {
+    return 'License key not found.';
+  }
+}
+
+function listLicenseKeys() {
+  return JSON.stringify(getLicenseKeys());
+}
+
 function validateLicenseKey(key) {
   try {
-    var licenses = getLicenseData();
-    if (!licenses[key]) {
+    var keys = getLicenseKeys();
+    if (!keys[key]) {
       return JSON.stringify({ success: false, message: 'Invalid license key.' });
     }
-    var expiry = licenses[key];
+    var expiry = keys[key];
     var today = new Date();
     today.setHours(0, 0, 0, 0);
     var expiryDate = new Date(expiry);
@@ -1542,6 +1559,14 @@ function validateLicenseKey(key) {
 }
 
 function hasAnyLicense() {
-  var licenses = getLicenseData();
-  return Object.keys(licenses).length > 0;
+  var keys = getLicenseKeys();
+  return Object.keys(keys).length > 0;
 }
+
+
+
+//setLicenseKey('demo100', '2026-05-02');
+
+//removeLicenseKey('test280326');
+
+//listLicenseKeys();
