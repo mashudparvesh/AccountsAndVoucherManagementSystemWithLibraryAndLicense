@@ -290,7 +290,7 @@
             <div class="col-12">
                 <div class="card">
                     <div class="card-body d-flex flex-wrap gap-2 align-items-center">
-                        <button class="btn btn-warning" onclick="setupSheets()" id="setupBtn" style="display:none;">
+                        <button class="btn btn-warning" onclick="setupSheets()" id="setupBtn" >
                             <i class="fas fa-cog me-1"></i> Setup Sheets
                         </button>
                         <span id="setupStatus" class="ms-2 text-warning"></span>
