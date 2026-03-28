@@ -1,6 +1,3 @@
-// ==================== CLIENT WEB APP ====================
-// This file serves the UI and calls the library (AVMS_Lib)
-
 function doGet() {
   return HtmlService.createTemplateFromFile('Index').evaluate()
     .setTitle('Voucher System')
@@ -8,8 +5,6 @@ function doGet() {
 }
 
 // ==================== WRAPPER FUNCTIONS ====================
-// These forward every call to the library.
-
 function setupSheets() { return AVMS_Lib.setupSheets(); }
 function getInfoData() { return AVMS_Lib.getInfoData(); }
 function updateInfoData(infoData) { return AVMS_Lib.updateInfoData(infoData); }
@@ -42,8 +37,3 @@ function forceDriveWritePermission() { return AVMS_Lib.forceDriveWritePermission
 // License wrappers
 function hasAnyLicense() { return AVMS_Lib.hasAnyLicense(); }
 function validateLicenseKey(key) { return AVMS_Lib.validateLicenseKey(key); }
-
-// Optional admin wrappers (if you want to manage keys from client script editor)
-function setLicenseKey(key, expiryDate) { return AVMS_Lib.setLicenseKey(key, expiryDate); }
-function removeLicenseKey(key) { return AVMS_Lib.removeLicenseKey(key); }
-function listLicenseKeys() { return AVMS_Lib.listLicenseKeys(); }
