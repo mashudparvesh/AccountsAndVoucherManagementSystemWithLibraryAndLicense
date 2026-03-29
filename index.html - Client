@@ -1097,7 +1097,7 @@
                 <div class="alert alert-warning alert-dismissible fade show" role="alert" style="position: fixed; top: 20px; right: 20px; z-index: 9999; max-width: 350px;">
                     <strong>⚠️ License Expiring Soon!</strong><br>
                     Your license will expire in ${daysLeft} day(s).<br>
-                    Please contact <strong>+880 1712 345678</strong> or email <strong>info@company.com</strong> to renew.
+                    Please contact <strong>+880 1775 316434</strong> or email <strong>mashudrus@gmail.com</strong> to renew.
                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>
             `;
