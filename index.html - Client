@@ -146,6 +146,7 @@
             border-radius: 8px;
             padding: 8px 8px;
             font-weight: 500;
+            font-size: 0.95rem;
             transition: all 0.15s;
             border: none;
         }
@@ -1829,6 +1830,8 @@
                     alert(r.message);
                     loadAllClients();
                     loadCompanyInfo();
+                    // Hide the button after first successful setup
+                    document.getElementById('setupBtn').style.display = 'none';
                 }
             }).setupSheets();
         }
