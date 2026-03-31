@@ -33,6 +33,8 @@ function getCurrentVoucher() { return AVMS_Lib.getCurrentVoucher(); }
 function clearCurrentVoucher() { return AVMS_Lib.clearCurrentVoucher(); }
 function getSheetUrl() { return AVMS_Lib.getSheetUrl(); }
 function forceDriveWritePermission() { return AVMS_Lib.forceDriveWritePermission(); }
+function isSheetsSetup() { return AVMS_Lib.isSheetsSetup(); }
+
 
 // License wrappers
 function hasAnyLicense() { return AVMS_Lib.hasAnyLicense(); }
