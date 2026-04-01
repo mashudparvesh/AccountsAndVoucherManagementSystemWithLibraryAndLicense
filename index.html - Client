@@ -1122,6 +1122,28 @@
         .hasAnyLicense();
 }
 
+function verifyLicense() {
+    var key = document.getElementById('licenseKeyInput').value.trim();
+    if (!key) {
+        alert('Please enter a license key.');
+        return;
+    }
+    google.script.run
+        .withSuccessHandler(function(response) {
+            var data = JSON.parse(response);
+            if (data.success) {
+                localStorage.setItem('license_key', key);
+                localStorage.setItem('license_expiry', data.expiration);
+                $('#licenseModal').modal('hide');
+                disableApp(false);
+                checkExpiryWarning(data.expiration);
+            } else {
+                document.getElementById('licenseMessage').innerHTML = '<i class="fas fa-times-circle me-2"></i> ' + data.message;
+            }
+        })
+        .validateLicenseKey(key);
+}
+
     // ==================== FINANCIAL REPORT FUNCTIONS ====================
     function generateFinancialReportPDF() {
         const startDate = document.getElementById('reportStartDate').value;
