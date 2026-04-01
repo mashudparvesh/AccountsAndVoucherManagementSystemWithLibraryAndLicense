@@ -35,7 +35,68 @@ function getSheetUrl() { return AVMS_Lib.getSheetUrl(); }
 function forceDriveWritePermission() { return AVMS_Lib.forceDriveWritePermission(); }
 function isSheetsSetup() { return AVMS_Lib.isSheetsSetup(); }
 
+// ==================== LICENSE SYSTEM (Client-side) ====================
+function getLicenseKeys() {
+  try {
+    var stored = PropertiesService.getScriptProperties().getProperty('LICENSES');
+    if (!stored) return {};
+    return JSON.parse(stored);
+  } catch (e) {
+    return {};
+  }
+}
 
-// License wrappers
-function hasAnyLicense() { return AVMS_Lib.hasAnyLicense(); }
-function validateLicenseKey(key) { return AVMS_Lib.validateLicenseKey(key); }
+function saveLicenseKeys(keys) {
+  PropertiesService.getScriptProperties().setProperty('LICENSES', JSON.stringify(keys));
+}
+
+function setLicenseKey(key, expiryDate) {
+  var keys = getLicenseKeys();
+  keys[key] = expiryDate; // expiryDate format: YYYY-MM-DD
+  saveLicenseKeys(keys);
+  return 'License added/updated: ' + key + ' expires on ' + expiryDate;
+}
+
+function removeLicenseKey(key) {
+  var keys = getLicenseKeys();
+  if (keys[key]) {
+    delete keys[key];
+    saveLicenseKeys(keys);
+    return 'License removed: ' + key;
+  } else {
+    return 'License key not found.';
+  }
+}
+
+function listLicenseKeys() {
+  return JSON.stringify(getLicenseKeys());
+}
+
+function validateLicenseKey(key) {
+  try {
+    var keys = getLicenseKeys();
+    if (!keys[key]) {
+      return JSON.stringify({ success: false, message: 'Invalid license key.' });
+    }
+    var expiry = keys[key];
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+    var expiryDate = new Date(expiry);
+    if (expiryDate < today) {
+      return JSON.stringify({ success: false, message: 'License has expired.' });
+    }
+    return JSON.stringify({ success: true, message: 'License valid.', expiration: expiry });
+  } catch (e) {
+    return JSON.stringify({ success: false, message: e.toString() });
+  }
+}
+
+function hasAnyLicense() {
+  var keys = getLicenseKeys();
+  return Object.keys(keys).length > 0;
+}
+
+
+//setLicenseKey('biswas1426', '2026-06-30')
+
+//listLicenseKeys();
