@@ -1,15 +1,21 @@
 // ==================== CENTRAL LICENSE SHEET ID ====================
-var LICENSE_SPREADSHEET_ID = '1AbtvScsvYL_Fn3NT3KxdDDTjmjbPhXJuNgNY5GNLDbU'; // Your license sheet
+var LICENSE_SPREADSHEET_ID = '1AbtvScsvYL_Fn3NT3KxdDDTjmjbPhXJuNgNY5GNLDbU';
 
 // ==================== REST OF THE ORIGINAL CODE ====================
 var ss = SpreadsheetApp.getActiveSpreadsheet();
 var SCRIPT_PROPERTIES = PropertiesService.getScriptProperties();
 
-// =================== SIMPLE DATE FORMATTER ===================
+// =================== SIMPLE DATE FORMATTER (FIXED: handles both formats) ===================
 function storeDateSimply(dateInput) {
   if (!dateInput) return '';
+  // Already DD-MM-YYYY
   if (typeof dateInput === 'string' && dateInput.length === 10 && dateInput[2] === '-' && dateInput[5] === '-') {
     return dateInput;
+  }
+  // YYYY-MM-DD -> convert to DD-MM-YYYY
+  if (typeof dateInput === 'string' && dateInput.length === 10 && dateInput[4] === '-' && dateInput[7] === '-') {
+    var parts = dateInput.split('-');
+    return parts[2] + '-' + parts[1] + '-' + parts[0];
   }
   try {
     var d = new Date(dateInput);
@@ -24,18 +30,14 @@ function storeDateSimply(dateInput) {
 }
 
 // =================== SETUP SHEETS ===================
+
 function setupSheets() {
   try {
-    // Save existing license keys before wiping properties
     var existingLicenses = getLicenseKeys();
-    
     SCRIPT_PROPERTIES.deleteAllProperties();
-    
-    // Restore license keys
     if (Object.keys(existingLicenses).length > 0) {
       saveLicenseKeys(existingLicenses);
     }
-    
     var sheets = ss.getSheets();
     var defaultSheet = sheets[0];
     if (defaultSheet.getName() !== 'Info') defaultSheet.setName('Info');
@@ -55,8 +57,6 @@ function setupSheets() {
       ['Account Manager', 'Mr. Robert Brown']
     ];
     infoSheet.getRange(2, 1, infoData.length, 2).setValues(infoData);
-    
-    // Format Info sheet
     var infoHeader = infoSheet.getRange('A1:B1');
     infoHeader.setFontWeight('bold').setBackground('#4CAF50').setFontColor('white').setBorder(true, true, true, true, true, true);
     infoSheet.getRange('A2:B' + (infoData.length + 1)).setBorder(true, true, true, true, true, true);
@@ -64,7 +64,6 @@ function setupSheets() {
     infoSheet.setColumnWidth(1, 150);
     infoSheet.setColumnWidth(2, 250);
 
-    // Parties Sheet
     var partiesSheet = ss.insertSheet('Parties');
     partiesSheet.getRange('A1:F1').setValues([['Party Name', 'Type', 'Contact', 'Email', 'Address', 'Created At']]);
     var partiesHeader = partiesSheet.getRange('A1:F1');
@@ -77,7 +76,6 @@ function setupSheets() {
     partiesSheet.setColumnWidth(5, 300);
     partiesSheet.setColumnWidth(6, 180);
 
-    // Transactions Sheet
     var transSheet = ss.insertSheet('Transactions');
     var transHeaders = ['Voucher No', 'Date', 'Type', 'Category', 'SL', 'Particulars', 'Amount', 'Party', 'Company Name', 'Prepared By', 'Status', 'Created At'];
     transSheet.getRange(1, 1, 1, transHeaders.length).setValues([transHeaders]);
@@ -90,7 +88,6 @@ function setupSheets() {
     transSheet.setColumnWidth(10, 150); transSheet.setColumnWidth(11, 100); transSheet.setColumnWidth(12, 180);
     transSheet.getRange('G2:G').setNumberFormat('"৳ "#,##0.00');
 
-    // Summary Sheet
     var summarySheet = ss.insertSheet('Summary');
     summarySheet.getRange('A1:D1').setValues([['Category/Type', 'Total Amount', 'Count', 'Last Updated']]);
     var summaryHeader = summarySheet.getRange('A1:D1');
@@ -101,7 +98,6 @@ function setupSheets() {
     summarySheet.getRange('B:B').setNumberFormat('"৳ "#,##0.00');
     summarySheet.getRange('D:D').setNumberFormat('yyyy-mm-dd hh:mm:ss');
 
-    // Type Sheets
     var types = ['Payment', 'Purchase', 'Expenses', 'Receive', 'Due Payment', 'Sales'];
     types.forEach(function(type) {
       var typeSheet = ss.insertSheet(type);
@@ -115,7 +111,6 @@ function setupSheets() {
       typeSheet.getRange('F:F').setNumberFormat('"৳ "#,##0.00');
     });
 
-    // Category Sheets
     var categories = ['Paid', 'Due', 'Cash', 'Bank', 'Credit', 'Credit payment by Cash', 'Credit payment by Bank'];
     categories.forEach(function(category) {
       var catSheet = ss.insertSheet(category);
@@ -129,13 +124,32 @@ function setupSheets() {
       catSheet.getRange('F:F').setNumberFormat('"৳ "#,##0.00');
     });
 
+    // ===== NEW: Set all Date columns to Plain Text =====
+    var allSheets = ss.getSheets();
+    allSheets.forEach(function(sheet) {
+      var name = sheet.getName();
+      if (name === 'Info' || name === 'Parties') return;
+      var headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+      var dateColIndex = -1;
+      for (var i = 0; i < headerRow.length; i++) {
+        if (headerRow[i] === 'Date') {
+          dateColIndex = i;
+          break;
+        }
+      }
+      if (dateColIndex !== -1) {
+        var colLetter = String.fromCharCode(65 + dateColIndex);
+        sheet.getRange(colLetter + ':' + colLetter).setNumberFormat('@');
+      }
+    });
+
     infoSheet.activate();
     return JSON.stringify({ success: true, message: '✅ All sheets created successfully!', sheetUrl: ss.getUrl() });
   } catch (error) {
     return JSON.stringify({ success: false, message: '❌ Error: ' + error.toString() });
   }
 }
-// ==== code for hide setup button ==== 
+
 function isSheetsSetup() {
   try {
     var sheets = ss.getSheets().map(function(s) { return s.getName(); });
@@ -290,6 +304,7 @@ function deleteParty(rowNum) {
   }
 }
 
+// =================== PARTY OUTSTANDING SUMMARY (FIXED LOGIC) ===================
 // =================== PARTY OUTSTANDING SUMMARY ===================
 function getPartyOutstanding(filterType) {
   try {
@@ -431,7 +446,7 @@ function createPartyReportHTML(data, transactions) {
       '     <td>' + escapeHtml(t.type) + ' (' + escapeHtml(t.category) + ')</td>' +
       '     <td>' + escapeHtml(t.particulars) + '</td>' +
       '<td style="text-align: right; white-space: nowrap;">৳ ' + t.amount.toFixed(2) + '</td>' +
-      '   </tr>';
+      '   <tr>';
   }).join('');
 
   return '<!DOCTYPE html>\n' +
@@ -560,6 +575,11 @@ function generateVoucherNumber(type, category, dateStr) {
   }
 }
 
+// NEW: Preview voucher number without creating voucher
+function getPreviewVoucherNumber(type, category, date) {
+  return generateVoucherNumber(type, category, date);
+}
+
 // =================== CREATE VOUCHER ===================
 function createVoucher(formData) {
   try {
@@ -583,6 +603,7 @@ function createVoucher(formData) {
 }
 
 // =================== POST VOUCHER TO SHEETS ===================
+
 function postVoucherToSheets() {
   try {
     var voucherJson = SCRIPT_PROPERTIES.getProperty('CURRENT_VOUCHER');
@@ -597,10 +618,26 @@ function postVoucherToSheets() {
     var items = voucher.items;
     var party = voucher.party || '';
 
+    // ===== ১. Transactions শীট =====
+    var transSheet = ss.getSheetByName('Transactions');
+    if (!transSheet) transSheet = ss.insertSheet('Transactions');
+    // Transactions শীটে পর্যাপ্ত সারি আছে কিনা চেক করো
+    ensureSufficientRows(transSheet, 10, 100);
+    
+    // ===== ২. Type শীট (যেমন Payment, Purchase ইত্যাদি) =====
+    var typeSheet = ss.getSheetByName(voucher.type);
+    if (!typeSheet) typeSheet = ss.insertSheet(voucher.type);
+    ensureSufficientRows(typeSheet, 10, 100);
+    
+    // ===== ৩. Category শীট (যেমন Paid, Due, Cash ইত্যাদি) =====
+    var catSheet = ss.getSheetByName(voucher.category);
+    if (!catSheet) catSheet = ss.insertSheet(voucher.category);
+    ensureSufficientRows(catSheet, 10, 100);
+
+    // এখন ডেটা লেখা শুরু করি
     for (var i = 0; i < items.length; i++) {
       var item = items[i];
-      var transSheet = ss.getSheetByName('Transactions');
-      if (!transSheet) transSheet = ss.insertSheet('Transactions');
+      
       transSheet.appendRow([
         voucher.voucherNumber,
         storeDateSimply(voucher.date),
@@ -616,8 +653,6 @@ function postVoucherToSheets() {
         formattedTime
       ]);
 
-      var typeSheet = ss.getSheetByName(voucher.type);
-      if (!typeSheet) typeSheet = ss.insertSheet(voucher.type);
       typeSheet.appendRow([
         voucher.voucherNumber,
         storeDateSimply(voucher.date),
@@ -629,8 +664,6 @@ function postVoucherToSheets() {
         'Posted'
       ]);
 
-      var catSheet = ss.getSheetByName(voucher.category);
-      if (!catSheet) catSheet = ss.insertSheet(voucher.category);
       catSheet.appendRow([
         voucher.voucherNumber,
         storeDateSimply(voucher.date),
@@ -644,6 +677,25 @@ function postVoucherToSheets() {
 
       updateSummarySheet(voucher.type, voucher.category, parseFloat(item.amount));
     }
+
+    // ===== Date কলামগুলো প্লেইন টেক্সট ফরম্যাটে সেট করা (ঐচ্ছিক) =====
+    var allSheets = ss.getSheets();
+    allSheets.forEach(function(sheet) {
+      var name = sheet.getName();
+      if (name === 'Info' || name === 'Parties') return;
+      var headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+      var dateColIndex = -1;
+      for (var j = 0; j < headerRow.length; j++) {
+        if (headerRow[j] === 'Date') {
+          dateColIndex = j;
+          break;
+        }
+      }
+      if (dateColIndex !== -1) {
+        var colLetter = String.fromCharCode(65 + dateColIndex);
+        sheet.getRange(colLetter + ':' + colLetter).setNumberFormat('@');
+      }
+    });
 
     voucherData.posted = true;
     SCRIPT_PROPERTIES.setProperty('CURRENT_VOUCHER', JSON.stringify(voucherData));
@@ -684,7 +736,7 @@ function updateSummarySheet(type, category, amount) {
   }
 }
 
-// =================== FINANCIAL SUMMARY ===================
+// =================== FINANCIAL SUMMARY (FIXED LOGIC) ===================
 function getFinancialSummary() {
   try {
     var transSheet = ss.getSheetByName('Transactions');
@@ -715,6 +767,7 @@ function getFinancialSummary() {
         }
       }
 
+      // Payments (cash/bank) reduce balance
       if ((type === 'Payment' || type === 'Expenses' || type === 'Purchase') &&
           (category === 'Paid' || category === 'Cash' || category === 'Bank')) {
         totalPaidOut += amount;
@@ -724,10 +777,12 @@ function getFinancialSummary() {
         totalDuePayments += amount;
       }
 
+      // Due incurred when buying on credit
       if ((type === 'Payment' || type === 'Purchase' || type === 'Expenses') && category === 'Due') {
         totalDueIncurred += amount;
       }
 
+      // Credit sales
       if (type === 'Sales' && category === 'Credit') {
         totalCreditIncurred += amount;
       }
@@ -983,7 +1038,7 @@ function createPDFTemplate(data) {
     '        <div class="signature-section">\n' +
     '            <div class="signature-box"><div class="signature-line"></div><div class="signature-name">' + escapeHtml(company.preparedBy || '') + '</div><div class="signature-title">Prepared By</div></div>\n' +
     '            <div class="signature-box"><div class="signature-line"></div><div class="signature-name">' + escapeHtml(company.authorizedBy || '') + '</div><div class="signature-title">Authorized By</div></div>\n' +
-    '            <div class="signature-box"><div class="signature-line"></div><div class="signature-name">' + escapeHtml(company.accountManager || '') + '</div><div class="signature-title">Account Manager</div></div>\n' +
+    '            <div class="signature-box"><div class="signature-line"></div><div class="signature-name">' + escapeHtml(company.accountManager || '') + '</div><div class="signature-title">Received By</div></div>\n' +
     '        </div>\n' +
     '        <div class="footer"><p>This is a computer generated voucher. No signature required.</p><p>Printed on: ' + printDate + '</p></div>\n' +
     '    </div>\n' +
@@ -1127,8 +1182,14 @@ function convertToCSV(data) {
 }
 
 // =================== EXPORT DATA ===================
+
 function exportData(startDateStr, endDateStr, format) {
   try {
+    var startDate = new Date(startDateStr);
+    var endDate = new Date(endDateStr);
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setHours(23, 59, 59, 999);
+
     var sheetsToExport = getExportSheets();
     var zipBlobs = [];
     var allHtml = '';
@@ -1137,40 +1198,51 @@ function exportData(startDateStr, endDateStr, format) {
     for (var s = 0; s < sheetsToExport.length; s++) {
       var sheet = sheetsToExport[s];
       var sheetName = sheet.getName();
-      var data;
       
-      if (sheetName === 'Transactions') {
-        var allData = sheet.getDataRange().getValues();
-        var headers = allData[0];
+      // Skip Summary sheet (it doesn't have Date column)
+      if (sheetName === 'Summary') continue;
+      
+      var allData = sheet.getDataRange().getValues();
+      if (allData.length < 2) continue;
+      
+      var headers = allData[0];
+      var dateColIndex = -1;
+      
+      // Find Date column dynamically
+      for (var col = 0; col < headers.length; col++) {
+        if (headers[col] && headers[col].toString().trim() === 'Date') {
+          dateColIndex = col;
+          break;
+        }
+      }
+      
+      var data;
+      if (dateColIndex === -1) {
+        // No Date column – include all rows (but we already skip summary, so this is rare)
+        data = allData;
+      } else {
         var filteredRows = [];
-        var startDate = new Date(startDateStr);
-        var endDate = new Date(endDateStr);
-        startDate.setHours(0,0,0,0);
-        endDate.setHours(23,59,59,999);
-        
         for (var i = 1; i < allData.length; i++) {
           var row = allData[i];
-          var dateVal = row[1];
+          var dateVal = row[dateColIndex];
           if (!dateVal) continue;
-          var rowDate = parseDateForExport(dateVal);
-          if (rowDate >= startDate && rowDate <= endDate) {
-            row[1] = storeDateSimply(dateVal);
+          var rowDate = parseDateToObject(dateVal);
+          if (!rowDate) continue;
+          if (rowDate.getTime() >= startDate.getTime() && rowDate.getTime() <= endDate.getTime()) {
+            // Convert date to DD-MM-YYYY string for display
+            row[dateColIndex] = storeDateSimply(dateVal);
             filteredRows.push(row);
           }
         }
+        if (filteredRows.length === 0) continue;
         data = [headers].concat(filteredRows);
-      } else {
-        data = sheet.getDataRange().getValues();
       }
-      
-      if (data.length <= 1) continue;
       
       var csv = convertToCSV(data);
       var csvBlob = Utilities.newBlob(csv, 'text/csv', sheetName + '.csv');
       
       if (format === 'PDF') {
-        var isLastSheet = (s === sheetsToExport.length - 1);
-        var html = generateSheetHTML(data, sheetName, company, isLastSheet);
+        var html = generateSheetHTML(data, sheetName, company, (s === sheetsToExport.length - 1));
         allHtml += html;
       } else {
         zipBlobs.push(csvBlob);
@@ -1179,23 +1251,20 @@ function exportData(startDateStr, endDateStr, format) {
     
     if (format === 'PDF') {
       if (!allHtml) return JSON.stringify({ success: false, message: 'No data to export.' });
-      
       allHtml = allHtml.replace(/<div style="page-break-before: always;"><\/div>\s*$/, '');
-      
-      var finalHtml = '<html><head><meta charset="UTF-8"><style>' +
-        '@page { @bottom-right { content: "Page " counter(page) " of " counter(pages); font-size: 8px; color: #666; } } ' +
-        'body { margin: 0; padding: 20px; font-family: Arial, sans-serif; } ' +
-        '@media print { div[style*="page-break"] { page-break-before: avoid; } }' +
-        '</style></head><body>' + allHtml + '</body></html>';
-      
+      var finalHtml = '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
+        '<style>' +
+        '@page { size: A4; margin: 1.5cm; }' +
+        'body { margin: 0; padding: 0; font-family: "Segoe UI", Arial, sans-serif; }' +
+        '.page-break { page-break-before: always; }' +
+        '</style>' +
+        '</head><body>' + allHtml + '</body></html>';
       var htmlBlob = Utilities.newBlob(finalHtml, MimeType.HTML, 'export.html');
       var pdfBlob = htmlBlob.getAs(MimeType.PDF);
       var base64 = Utilities.base64Encode(pdfBlob.getBytes());
       return JSON.stringify({ success: true, base64: base64, filename: 'export_' + startDateStr + '_to_' + endDateStr + '.pdf', message: 'Export successful' });
     } else {
-      if (zipBlobs.length === 0) {
-        return JSON.stringify({ success: false, message: 'No data to export.' });
-      }
+      if (zipBlobs.length === 0) return JSON.stringify({ success: false, message: 'No data to export.' });
       var zipBlob = Utilities.zip(zipBlobs, 'export_' + startDateStr + '_to_' + endDateStr + '.zip');
       var base64 = Utilities.base64Encode(zipBlob.getBytes());
       return JSON.stringify({ success: true, base64: base64, filename: 'export_' + startDateStr + '_to_' + endDateStr + '.zip', message: 'Export successful' });
@@ -1205,9 +1274,45 @@ function exportData(startDateStr, endDateStr, format) {
   }
 }
 
+// হেল্পার ফাংশন – যেকোনো ফরম্যাটের তারিখকে YYYY-MM-DD স্ট্রিং-এ নিয়ে আসে
+function convertToYYYYMMDD(dateInput) {
+  if (!dateInput) return null;
+  if (dateInput instanceof Date) {
+    var y = dateInput.getFullYear();
+    var m = ('0' + (dateInput.getMonth() + 1)).slice(-2);
+    var d = ('0' + dateInput.getDate()).slice(-2);
+    return y + '-' + m + '-' + d;
+  }
+  if (typeof dateInput === 'string') {
+    // Remove any extra spaces
+    dateInput = dateInput.trim();
+    // Check DD-MM-YYYY
+    var parts = dateInput.split('-');
+    if (parts.length === 3) {
+      // If first part is day (2 digits) and third part is year (4 digits)
+      if (parts[0].length === 2 && parts[2].length === 4) {
+        return parts[2] + '-' + parts[1] + '-' + parts[0];
+      }
+      // If already YYYY-MM-DD
+      if (parts[0].length === 4 && parts[2].length === 2) {
+        return dateInput;
+      }
+    }
+    // Try parsing as generic date
+    var d = new Date(dateInput);
+    if (!isNaN(d.getTime())) {
+      var y = d.getFullYear();
+      var m = ('0' + (d.getMonth() + 1)).slice(-2);
+      var dd = ('0' + d.getDate()).slice(-2);
+      return y + '-' + m + '-' + dd;
+    }
+  }
+  return null;
+}
+
 function getExportSheets() {
   var allSheets = ss.getSheets();
-  var exclude = ['Info', 'Parties'];
+  var exclude = ['Info', 'Parties', 'Signatures'];
   var exportSheets = [];
   for (var i = 0; i < allSheets.length; i++) {
     if (exclude.indexOf(allSheets[i].getName()) === -1) {
@@ -1217,64 +1322,118 @@ function getExportSheets() {
   return exportSheets;
 }
 
-function parseDateForExport(dateVal) {
-  if (dateVal instanceof Date) {
-    return new Date(dateVal.getFullYear(), dateVal.getMonth(), dateVal.getDate());
-  }
-  if (typeof dateVal === 'string') {
-    var parts = dateVal.split('-');
-    if (parts.length === 3) {
-      return new Date(parts[2], parts[1] - 1, parts[0]);
+function parseDateToObject(dateInput) {
+  if (!dateInput) return null;
+  if (dateInput instanceof Date) return dateInput;
+  if (typeof dateInput === 'string') {
+    // Try DD-MM-YYYY
+    var parts = dateInput.split('-');
+    if (parts.length === 3 && parts[0].length === 2 && parts[1].length === 2 && parts[2].length === 4) {
+      var d = new Date(parts[2], parts[1]-1, parts[0]);
+      if (!isNaN(d.getTime())) return d;
     }
+    // Try YYYY-MM-DD
+    if (parts.length === 3 && parts[0].length === 4 && parts[2].length === 2) {
+      var d2 = new Date(parts[0], parts[1]-1, parts[2]);
+      if (!isNaN(d2.getTime())) return d2;
+    }
+    // Try generic
+    var d3 = new Date(dateInput);
+    if (!isNaN(d3.getTime())) return d3;
   }
-  return new Date(dateVal);
+  return null;
 }
 
-function generateSheetHTML(data, sheetName, company, isLastSheet = false) {
+function generateSheetHTML(data, sheetName, company, isLastSheet) {
   if (!data || data.length === 0) return '';
+
+  var style = `
+    <style>
+      .sheet-container { font-family: 'Segoe UI', Arial, sans-serif; margin-bottom: 40px; page-break-after: always; }
+      .company-header { text-align: center; margin-bottom: 25px; border-bottom: 2px solid #f5b342; padding-bottom: 10px; }
+      .company-name { font-size: 24px; font-weight: bold; color: #2c3e50; }
+      .company-details { font-size: 11px; color: #666; margin-top: 5px; }
+      .sheet-title { font-size: 18px; font-weight: bold; background: #f5b342; color: #000; padding: 8px; text-align: center; margin: 20px 0 15px; border-radius: 4px; }
+      .data-table { width: 100%; border-collapse: collapse; font-size: 10px; }
+      .data-table th { background: #2c3e50; color: #000000 !important; padding: 6px; border: 1px solid #000000; text-align: center; font-weight: bold; }
+      .data-table td { padding: 4px 6px; border: 1px solid #000000; vertical-align: top; color: #000000 !important; }
+      .amount-cell { text-align: right; white-space: nowrap; color: #000000 !important; }
+      .date-cell { white-space: nowrap; color: #000000 !important; }
+      .footer-note { text-align: right; font-size: 8px; color: #666; margin-top: 10px; }
+    </style>
+  `;
+
+  var headers = data[0];
+  var headerRow = '<tr>' + headers.map(function(h) {
+    return '<th style="color:#000000;">' + escapeHtml(String(h)) + '</th>';
+  }).join('') + '</tr>';
+
   var rows = '';
   for (var i = 1; i < data.length; i++) {
     var row = data[i];
-    rows += '<tr>';
+    var cells = '';
     for (var j = 0; j < row.length; j++) {
       var cell = row[j];
-      if (j === 6 && typeof cell === 'number') {
-        rows += '<td style="text-align: right; white-space: nowrap;">৳ ' + cell.toFixed(2) + '</td>';
-      } else {
-        rows += '<td>' + escapeHtml(String(cell)) + '</td>';
+      var displayValue = '';
+      var cellClass = '';
+
+      var isDateColumn = (headers[j] === 'Date' || headers[j] === 'Created At' || headers[j] === 'Last Updated');
+      if (isDateColumn && cell) {
+        displayValue = formatDateForExport(cell);
+        cellClass = 'date-cell';
       }
+      else if (typeof cell === 'number' && (headers[j] === 'Amount' || headers[j] === 'Total Amount')) {
+        displayValue = '৳ ' + cell.toFixed(2);
+        cellClass = 'amount-cell';
+      }
+      else {
+        displayValue = escapeHtml(String(cell));
+        cellClass = '';
+      }
+      cells += '<td class="' + cellClass + '" style="color:#000000;">' + displayValue + '</td>';
     }
-    rows += '</tr>';
+    rows += '<tr>' + cells + '</tr>';
   }
-  
-  var headers = data[0];
-  var headerRow = '<tr>';
-  for (var k = 0; k < headers.length; k++) {
-    headerRow += '<th>' + escapeHtml(String(headers[k])) + '</th>';
-  }
-  headerRow += '</tr>';
-  
+
   var printDate = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd-MM-yyyy hh:mm a");
-  
-  var sheetHtml = '<div style="margin-bottom: 30px; font-family: Arial, sans-serif;">\n' +
-    '  <div style="text-align: center; margin-bottom: 20px; border-bottom: 1px solid #ddd; padding-bottom: 10px;">\n' +
-    '    <div style="font-size: 24px; font-weight: bold; color: #2c3e50;">' + escapeHtml(company.name || 'Your Company') + '</div>\n' +
-    '    <div style="font-size: 12px; color: #666;">' + escapeHtml(company.address || '') + '</div>\n' +
-    '    <div style="font-size: 12px; color: #666;">Phone: ' + escapeHtml(company.phone || '') + ' | Email: ' + escapeHtml(company.email || '') + '</div>\n' +
-    '  </div>\n' +
-    '  <h2 style="color: #f5b342; font-size: 18px; margin-bottom: 10px;">' + escapeHtml(sheetName) + '</h2>\n' +
-    '  <table border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse; width: 100%; font-size: 9px; font-family: Arial, sans-serif;">\n' +
-    '    <thead>' + headerRow + '</thead>\n' +
-    '    <tbody>' + rows + '</tbody>\n' +
-    '  </table>\n' +
-    '  <div style="margin-top: 10px; font-size: 8px; color: #666; text-align: right;">Generated on: ' + printDate + '</div>\n' +
+
+  var html = '<div class="sheet-container">' +
+    style +
+    '<div class="company-header">' +
+    '  <div class="company-name">' + escapeHtml(company.name || 'Your Company') + '</div>' +
+    '  <div class="company-details">' + escapeHtml(company.address || '') + '<br>' +
+    '  Phone: ' + escapeHtml(company.phone || '') + ' | Email: ' + escapeHtml(company.email || '') + '</div>' +
+    '</div>' +
+    '<div class="sheet-title">' + escapeHtml(sheetName) + '</div>' +
+    '<table class="data-table">' +
+    '<thead>' + headerRow + '</thead>' +
+    '<tbody>' + rows + '</tbody>' +
+    '</table>' +
+    '<div class="footer-note">Generated on: ' + printDate + '</div>' +
     '</div>';
-  
-  if (!isLastSheet) {
-    sheetHtml += '<div style="page-break-before: always;"></div>';
+
+  return html;
+}
+
+function formatDateForExport(dateValue) {
+  if (!dateValue) return '';
+  if (dateValue instanceof Date) {
+    var d = dateValue;
+    var day = ('0' + d.getDate()).slice(-2);
+    var month = ('0' + (d.getMonth() + 1)).slice(-2);
+    var year = d.getFullYear();
+    return day + '-' + month + '-' + year;
   }
-  
-  return sheetHtml;
+  if (typeof dateValue === 'string') {
+    // DD-MM-YYYY
+    if (dateValue.match(/^\d{2}-\d{2}-\d{4}$/)) return dateValue;
+    // YYYY-MM-DD
+    if (dateValue.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      var parts = dateValue.split('-');
+      return parts[2] + '-' + parts[1] + '-' + parts[0];
+    }
+  }
+  return String(dateValue);
 }
 
 function escapeHtml(str) {
@@ -1522,4 +1681,190 @@ function forceDriveWritePermission() {
   testFile.setTrashed(true);
 }
 
+// =================== LICENSE SYSTEM (with external sheet validation) ===================
+function getLicenseKeys() {
+  try {
+    var stored = PropertiesService.getScriptProperties().getProperty('LICENSES');
+    if (!stored) return {};
+    return JSON.parse(stored);
+  } catch (e) {
+    return {};
+  }
+}
 
+function saveLicenseKeys(keys) {
+  PropertiesService.getScriptProperties().setProperty('LICENSES', JSON.stringify(keys));
+}
+
+function setLicenseKey(key, expiryDate) {
+  var keys = getLicenseKeys();
+  keys[key] = expiryDate;
+  saveLicenseKeys(keys);
+  return 'License added/updated: ' + key + ' expires on ' + expiryDate;
+}
+
+function removeLicenseKey(key) {
+  var keys = getLicenseKeys();
+  if (keys[key]) {
+    delete keys[key];
+    saveLicenseKeys(keys);
+    return 'License removed: ' + key;
+  } else {
+    return 'License key not found.';
+  }
+}
+
+function listLicenseKeys() {
+  return JSON.stringify(getLicenseKeys());
+}
+
+function validateLicenseKey(key) {
+  try {
+    // First check external license sheet
+    try {
+      var licenseSheet = SpreadsheetApp.openById(LICENSE_SPREADSHEET_ID).getSheetByName('Licenses');
+      if (licenseSheet) {
+        var data = licenseSheet.getDataRange().getValues();
+        for (var i = 1; i < data.length; i++) {
+          if (data[i][0] == key) {
+            var expiryDate = new Date(data[i][1]);
+            var today = new Date();
+            today.setHours(0, 0, 0, 0);
+            if (expiryDate >= today) {
+              // Also store locally for offline fallback
+              var keys = getLicenseKeys();
+              keys[key] = Utilities.formatDate(expiryDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+              saveLicenseKeys(keys);
+              return JSON.stringify({ success: true, message: 'License valid.', expiration: Utilities.formatDate(expiryDate, Session.getScriptTimeZone(), 'yyyy-MM-dd') });
+            } else {
+              return JSON.stringify({ success: false, message: 'License has expired.' });
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // Fallback to local storage if external sheet inaccessible
+      console.warn('External license sheet error: ' + e);
+    }
+
+    // Fallback to local storage
+    var keys = getLicenseKeys();
+    if (!keys[key]) {
+      return JSON.stringify({ success: false, message: 'Invalid license key.' });
+    }
+    var expiry = keys[key];
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+    var expiryDate = new Date(expiry);
+    if (expiryDate < today) {
+      return JSON.stringify({ success: false, message: 'License has expired.' });
+    }
+    return JSON.stringify({ success: true, message: 'License valid.', expiration: expiry });
+  } catch (e) {
+    return JSON.stringify({ success: false, message: e.toString() });
+  }
+}
+
+function hasAnyLicense() {
+  var keys = getLicenseKeys();
+  return Object.keys(keys).length > 0;
+}
+
+
+function convertAllDatesToPlainText() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheets = ss.getSheets();
+  sheets.forEach(function(sheet) {
+    var name = sheet.getName();
+    if (name === 'Info' || name === 'Parties' || name === 'Summary') return;
+    var headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var dateColIndex = -1;
+    for (var i = 0; i < headerRow.length; i++) {
+      if (headerRow[i] === 'Date') {
+        dateColIndex = i;
+        break;
+      }
+    }
+    if (dateColIndex === -1) return;
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return;
+    var range = sheet.getRange(2, dateColIndex+1, lastRow-1, 1);
+    var values = range.getValues();
+    var newValues = values.map(function(row) {
+      var val = row[0];
+      if (val instanceof Date) {
+        var d = val;
+        var day = ('0' + d.getDate()).slice(-2);
+        var month = ('0' + (d.getMonth() + 1)).slice(-2);
+        var year = d.getFullYear();
+        return [day + '-' + month + '-' + year];
+      } else if (typeof val === 'string') {
+        var parsed = parseDateToObject(val);
+        if (parsed) {
+          var d = parsed;
+          var day = ('0' + d.getDate()).slice(-2);
+          var month = ('0' + (d.getMonth() + 1)).slice(-2);
+          var year = d.getFullYear();
+          return [day + '-' + month + '-' + year];
+        }
+        return [val];
+      } else {
+        return [val];
+      }
+    });
+    range.setValues(newValues);
+    var colLetter = String.fromCharCode(65 + dateColIndex);
+    sheet.getRange(colLetter + ':' + colLetter).setNumberFormat('@');
+  });
+  SpreadsheetApp.flush();
+  console.log('All dates converted to plain text.');
+}
+
+/**
+ * একটি শীটে পর্যাপ্ত খালি সারি আছে কিনা চেক করে, না থাকলে নতুন সারি যোগ করে।
+ * @param {Sheet} sheet - যে শীট চেক করতে হবে।
+ * @param {number} threshold - কতটি খালি সারি থাকলেই সারি যোগ করবে (ডিফল্ট 10)।
+ * @param {number} rowsToAdd - কতটি সারি যোগ করবে (ডিফল্ট 100)।
+ * @returns {boolean} - যদি সারি যোগ করা হয় true, অন্যথায় false।
+ */
+function ensureSufficientRows(sheet, threshold = 10, rowsToAdd = 100) {
+  if (!sheet) return false;
+  
+  var lastRow = sheet.getLastRow();        // শেষ সারি যেখানে ডেটা আছে
+  var maxRows = sheet.getMaxRows();        // শীটের মোট সারি (খালি সহ)
+  var emptyRows = maxRows - lastRow;       // খালি সারির সংখ্যা
+  
+  // যদি খালি সারি threshold-এর চেয়ে কম বা সমান হয়, তাহলে নতুন সারি যোগ করো
+  if (emptyRows <= threshold) {
+    sheet.insertRowsAfter(maxRows, rowsToAdd);
+    Logger.log('✅ ' + sheet.getName() + ' শীটে ' + rowsToAdd + ' টি নতুন সারি যোগ করা হয়েছে।');
+    return true;
+  } else {
+    Logger.log('ℹ️ ' + sheet.getName() + ' শীটে পর্যাপ্ত খালি সারি আছে (' + emptyRows + ' টি)।');
+    return false;
+  }
+}
+
+/**
+ * নির্দিষ্ট শীটগুলোর জন্য সারি চেক করে এবং প্রয়োজনে নতুন সারি যোগ করে।
+ * @param {string[]} sheetNames - শীটের নামের অ্যারে (যেমন ['Transactions', 'Payment', 'Paid'])।
+ * @param {number} threshold - কতটি খালি সারি থাকলেই সারি যোগ করবে।
+ * @param {number} rowsToAdd - কতটি সারি যোগ করবে।
+ * @returns {object} - প্রতিটি শীটের ফলাফল সহ একটি অবজেক্ট।
+ */
+function ensureSufficientRowsForAllSheets(sheetNames, threshold = 10, rowsToAdd = 100) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var results = {};
+  
+  sheetNames.forEach(function(name) {
+    var sheet = ss.getSheetByName(name);
+    if (sheet) {
+      results[name] = ensureSufficientRows(sheet, threshold, rowsToAdd);
+    } else {
+      Logger.log('⚠️ শীট পাওয়া যায়নি: ' + name);
+      results[name] = false;
+    }
+  });
+  
+  return results;
+}
