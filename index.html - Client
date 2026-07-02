@@ -275,11 +275,9 @@
             color: var(--accent-yellow);
         }
 
-    /* Spinner overlay */
-      #loadingSpinner {
-          transition: opacity 0.3s ease;
-      }
-
+        #loadingSpinner {
+            transition: opacity 0.3s ease;
+        }
     </style>
 </head>
 <body>
@@ -345,8 +343,6 @@
                 </div>
             </div>
         </div>
-
-
 
         <div id="storageStatus" class="alert" style="display: none;"></div>
 
@@ -467,11 +463,10 @@
                             </div>
                         </div>
                         <div id="postingProgress" class="posting-progress mt-4" style="display: none;">
-                            <h6 class="fw-semibold">Posting Progress:</h6>
-                            <div class="progress-step"><div class="step-icon step-pending" id="step1">1</div><div class="step-text">Transactions Sheet</div></div>
-                            <div class="progress-step"><div class="step-icon step-pending" id="step2">2</div><div class="step-text" id="step2Text">Type Sheet</div></div>
-                            <div class="progress-step"><div class="step-icon step-pending" id="step3">3</div><div class="step-text" id="step3Text">Category Sheet</div></div>
-                            <div class="progress-step"><div class="step-icon step-pending" id="step4">4</div><div class="step-text">Summary Sheet</div></div>
+                            <div class="spinner-border text-warning" role="status">
+                                <span class="visually-hidden">Posting...</span>
+                            </div>
+                            <span class="ms-2">Posting voucher to sheets...</span>
                         </div>
                         <div id="postingResult" class="mt-3"></div>
                         <div class="d-flex flex-wrap gap-2 mt-3">
@@ -791,7 +786,7 @@
                         <input type="text" id="infoAuthorizedBy" class="form-control">
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Account Manager</label>
+                        <label class="form-label">Received By</label>
                         <input type="text" id="infoAccountManager" class="form-control">
                     </div>
                 </div>
@@ -895,7 +890,6 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <!-- Financial Summary Content -->
                     <div class="row g-3 mb-3">
                         <div class="col-md-4">
                             <div class="stat-card">
@@ -990,68 +984,77 @@
     let currentClientData = null;
     let warningShown = false;
 
-    // ==================== INITIALIZATION ====================
-        document.addEventListener('DOMContentLoaded', function() {
-    let pendingCalls = 0;
-
-    function hideSpinnerIfDone() {
-        if (pendingCalls === 0) {
-            document.getElementById('loadingSpinner').style.display = 'none';
+    // ==================== HELPER: DISABLE APP DURING LICENSE CHECK ====================
+    function disableApp(disabled) {
+        const buttons = document.querySelectorAll('button:not(#licenseModal button)');
+        const inputs = document.querySelectorAll('input, select, textarea');
+        if (disabled) {
+            buttons.forEach(btn => btn.disabled = true);
+            inputs.forEach(inp => inp.disabled = true);
+        } else {
+            buttons.forEach(btn => btn.disabled = false);
+            inputs.forEach(inp => inp.disabled = false);
         }
     }
 
-    // ---- Initial page setup (non‑async) ----
-    document.getElementById('date').value = new Date().toISOString().split('T')[0];
-    addItemRow();
-    updateCategoryOptions();
-    generateVoucherNumber();
-    checkVoucherStorage();
-    loadFinancialSummary();
-    loadAllClients();
-    loadCompanyInfo();
-    $('#infoModal').on('show.bs.modal', function () {
-        loadInfoData();
+    // ==================== INITIALIZATION ====================
+    document.addEventListener('DOMContentLoaded', function() {
+        let pendingCalls = 0;
+
+        function hideSpinnerIfDone() {
+            if (pendingCalls === 0) {
+                document.getElementById('loadingSpinner').style.display = 'none';
+            }
+        }
+
+        document.getElementById('date').value = new Date().toISOString().split('T')[0];
+        addItemRow();
+        updateCategoryOptions();
+        generateVoucherNumber(); // calls server to get real preview
+        checkVoucherStorage();
+        loadFinancialSummary();
+        loadAllClients();
+        loadCompanyInfo();
+        $('#infoModal').on('show.bs.modal', function () {
+            loadInfoData();
+        });
+
+        var today = new Date();
+        var thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(today.getDate() - 30);
+        document.getElementById('exportStartDate').value = thirtyDaysAgo.toISOString().split('T')[0];
+        document.getElementById('exportEndDate').value = today.toISOString().split('T')[0];
+        
+        var firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        var lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        document.getElementById('reportStartDate').value = firstDayOfMonth.toISOString().split('T')[0];
+        document.getElementById('reportEndDate').value = lastDayOfMonth.toISOString().split('T')[0];
+
+        pendingCalls++;
+        google.script.run.withSuccessHandler(function(isSetup) {
+            if (isSetup) {
+                document.getElementById('setupBtn').style.display = 'none';
+            }
+            pendingCalls--;
+            hideSpinnerIfDone();
+        }).isSheetsSetup();
+
+        pendingCalls++;
+        checkLicenseStatus(function() {
+            pendingCalls--;
+            hideSpinnerIfDone();
+        });
+
+        setTimeout(function() {
+            var spinner = document.getElementById('loadingSpinner');
+            if (spinner && spinner.style.display !== 'none') {
+                console.warn('Spinner fallback: hiding after 5 seconds');
+                spinner.style.display = 'none';
+            }
+        }, 5000);
     });
 
-    var today = new Date();
-    var thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(today.getDate() - 30);
-    document.getElementById('exportStartDate').value = thirtyDaysAgo.toISOString().split('T')[0];
-    document.getElementById('exportEndDate').value = today.toISOString().split('T')[0];
-    
-    var firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    var lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-    document.getElementById('reportStartDate').value = firstDayOfMonth.toISOString().split('T')[0];
-    document.getElementById('reportEndDate').value = lastDayOfMonth.toISOString().split('T')[0];
-
-    // ---- Async: Check if sheets exist ----
-    pendingCalls++;
-    google.script.run.withSuccessHandler(function(isSetup) {
-        if (isSetup) {
-            document.getElementById('setupBtn').style.display = 'none';
-        }
-        pendingCalls--;
-        hideSpinnerIfDone();
-    }).isSheetsSetup();
-
-    // ---- Async: License check ----
-    pendingCalls++;
-    checkLicenseStatus(function() {
-        pendingCalls--;
-        hideSpinnerIfDone();
-    });
-
-    // ---- Fallback: hide spinner after 5 seconds if still visible ----
-    setTimeout(function() {
-        var spinner = document.getElementById('loadingSpinner');
-        if (spinner && spinner.style.display !== 'none') {
-            console.warn('Spinner fallback: hiding after 5 seconds');
-            spinner.style.display = 'none';
-        }
-    }, 5000);
-});
-
-    // ==================== SETUP SHEETS FUNCTION ====================
+    // ==================== SETUP SHEETS ====================
     function setupSheets() {
         document.getElementById('setupBtn').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Setting up...';
         google.script.run.withSuccessHandler(function(res) {
@@ -1069,80 +1072,91 @@
 
     // ==================== LICENSE FUNCTIONS ====================
     function checkLicenseStatus(callback) {
-    google.script.run
-        .withSuccessHandler(function(hasAny) {
-            if (!hasAny) {
-                document.getElementById('licenseMessage').innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i> No license configured. Please contact admin.';
-                $('#licenseModal').modal('show');
-                disableApp(true);
-                if (callback) callback();
-                return;
-            }
+        google.script.run
+            .withSuccessHandler(function(hasAny) {
+                if (!hasAny) {
+                    document.getElementById('licenseMessage').innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i> No license configured. Please contact admin.';
+                    $('#licenseModal').modal('show');
+                    disableApp(true);
+                    if (callback) callback();
+                    return;
+                }
 
-            var activatedKey = localStorage.getItem('license_key');
-            var storedExpiry = localStorage.getItem('license_expiry');
-            if (activatedKey && storedExpiry) {
-                google.script.run
-                    .withSuccessHandler(function(response) {
-                        var data = JSON.parse(response);
-                        if (data.success) {
-                            disableApp(false);
-                            checkExpiryWarning(data.expiration);
-                        } else {
-                            localStorage.removeItem('license_key');
-                            localStorage.removeItem('license_expiry');
-                            document.getElementById('licenseMessage').innerHTML = '<i class="fas fa-times-circle me-2"></i> ' + data.message;
+                var activatedKey = localStorage.getItem('license_key');
+                var storedExpiry = localStorage.getItem('license_expiry');
+                if (activatedKey && storedExpiry) {
+                    google.script.run
+                        .withSuccessHandler(function(response) {
+                            var data = JSON.parse(response);
+                            if (data.success) {
+                                disableApp(false);
+                                checkExpiryWarning(data.expiration);
+                            } else {
+                                localStorage.removeItem('license_key');
+                                localStorage.removeItem('license_expiry');
+                                document.getElementById('licenseMessage').innerHTML = '<i class="fas fa-times-circle me-2"></i> ' + data.message;
+                                $('#licenseModal').modal('show');
+                                disableApp(true);
+                            }
+                            if (callback) callback();
+                        })
+                        .withFailureHandler(function(err) {
+                            console.error('validateLicenseKey failed:', err);
+                            document.getElementById('licenseMessage').innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i> License validation error. Please contact admin.';
                             $('#licenseModal').modal('show');
                             disableApp(true);
-                        }
-                        if (callback) callback();
-                    })
-                    .withFailureHandler(function(err) {
-                        console.error('validateLicenseKey failed:', err);
-                        document.getElementById('licenseMessage').innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i> License validation error. Please contact admin.';
-                        $('#licenseModal').modal('show');
-                        disableApp(true);
-                        if (callback) callback();
-                    })
-                    .validateLicenseKey(activatedKey);
-            } else {
-                document.getElementById('licenseMessage').innerHTML = '<i class="fas fa-info-circle me-2"></i> Please enter your license key to continue.';
+                            if (callback) callback();
+                        })
+                        .validateLicenseKey(activatedKey);
+                } else {
+                    document.getElementById('licenseMessage').innerHTML = '<i class="fas fa-info-circle me-2"></i> Please enter your license key to continue.';
+                    $('#licenseModal').modal('show');
+                    disableApp(true);
+                    if (callback) callback();
+                }
+            })
+            .withFailureHandler(function(err) {
+                console.error('hasAnyLicense failed:', err);
+                document.getElementById('licenseMessage').innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i> License check error. Please contact admin.';
                 $('#licenseModal').modal('show');
                 disableApp(true);
                 if (callback) callback();
-            }
-        })
-        .withFailureHandler(function(err) {
-            console.error('hasAnyLicense failed:', err);
-            document.getElementById('licenseMessage').innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i> License check error. Please contact admin.';
-            $('#licenseModal').modal('show');
-            disableApp(true);
-            if (callback) callback();
-        })
-        .hasAnyLicense();
-}
-
-function verifyLicense() {
-    var key = document.getElementById('licenseKeyInput').value.trim();
-    if (!key) {
-        alert('Please enter a license key.');
-        return;
+            })
+            .hasAnyLicense();
     }
-    google.script.run
-        .withSuccessHandler(function(response) {
-            var data = JSON.parse(response);
-            if (data.success) {
-                localStorage.setItem('license_key', key);
-                localStorage.setItem('license_expiry', data.expiration);
-                $('#licenseModal').modal('hide');
-                disableApp(false);
-                checkExpiryWarning(data.expiration);
-            } else {
-                document.getElementById('licenseMessage').innerHTML = '<i class="fas fa-times-circle me-2"></i> ' + data.message;
-            }
-        })
-        .validateLicenseKey(key);
-}
+
+    function verifyLicense() {
+        var key = document.getElementById('licenseKeyInput').value.trim();
+        if (!key) {
+            alert('Please enter a license key.');
+            return;
+        }
+        google.script.run
+            .withSuccessHandler(function(response) {
+                var data = JSON.parse(response);
+                if (data.success) {
+                    localStorage.setItem('license_key', key);
+                    localStorage.setItem('license_expiry', data.expiration);
+                    $('#licenseModal').modal('hide');
+                    disableApp(false);
+                    checkExpiryWarning(data.expiration);
+                } else {
+                    document.getElementById('licenseMessage').innerHTML = '<i class="fas fa-times-circle me-2"></i> ' + data.message;
+                }
+            })
+            .validateLicenseKey(key);
+    }
+
+    function checkExpiryWarning(expiryDate) {
+        if (!expiryDate) return;
+        var expiry = new Date(expiryDate);
+        var today = new Date();
+        var daysLeft = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24));
+        if (daysLeft <= 7 && daysLeft > 0 && !warningShown) {
+            alert(`⚠️ Your license will expire in ${daysLeft} day(s). Please renew soon.`);
+            warningShown = true;
+        }
+    }
 
     // ==================== FINANCIAL REPORT FUNCTIONS ====================
     function generateFinancialReportPDF() {
@@ -1373,10 +1387,11 @@ function verifyLicense() {
                         `;
                         tbody.appendChild(row);
                     });
+                    // Fixed: use off().on() to prevent duplicate binding
                     $("#clientSearch").off("keyup").on("keyup", function() {
                         var value = $(this).val().toLowerCase();
                         $("#clientSummaryBody tr").filter(function() {
-                            $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1)
+                            $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1);
                         });
                     });
                 } else {
@@ -1598,13 +1613,11 @@ function verifyLicense() {
         const category = document.getElementById('category').value;
         const date = document.getElementById('date').value;
         if (!type || !category || !date) return;
-        const d = new Date(date);
-        const month = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"][d.getMonth()];
-        const year = d.getFullYear().toString().slice(-2);
-        let typePrefix = { 'Payment':'PY', 'Purchase':'PU', 'Expenses':'EX', 'Receive':'RC', 'Due Payment':'DP', 'Sales':'SA' }[type] || 'V';
-        let catMap = { 'Paid':'C', 'Due':'D', 'Cash':'C', 'Bank':'B', 'Credit':'R', 'Credit payment by Cash':'PC', 'Credit payment by Bank':'PB' };
-        let catPrefix = catMap[category] || 'X';
-        document.getElementById('voucherNumber').value = typePrefix + catPrefix + '-' + month + year + '-0001';
+        
+        // Call server to get real next voucher number
+        google.script.run.withSuccessHandler(function(voucherNo) {
+            document.getElementById('voucherNumber').value = voucherNo;
+        }).getPreviewVoucherNumber(type, category, date);
     }
 
     function createVoucher() {
@@ -1736,17 +1749,10 @@ function verifyLicense() {
         document.getElementById('postBtn').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Posting...';
         document.getElementById('postBtn').disabled = true;
         document.getElementById('postingProgress').style.display = 'block';
-        document.getElementById('step1').className = 'step-icon step-active';
-        document.getElementById('step2Text').textContent = currentVoucher.voucher.type + ' Sheet';
-        document.getElementById('step3Text').textContent = currentVoucher.voucher.category + ' Sheet';
 
         google.script.run
             .withSuccessHandler(function(result) {
-                document.getElementById('step1').className = 'step-icon step-completed';
-                document.getElementById('step2').className = 'step-icon step-completed';
-                document.getElementById('step3').className = 'step-icon step-completed';
-                document.getElementById('step4').className = 'step-icon step-completed';
-
+                document.getElementById('postingProgress').style.display = 'none';
                 if (result.includes('✅')) {
                     document.getElementById('postBtn').innerHTML = '<i class="fas fa-check"></i> Posted';
                     document.getElementById('postBtn').className = 'btn btn-success';
@@ -1755,13 +1761,11 @@ function verifyLicense() {
                     document.getElementById('statusBadge').textContent = 'Posted';
                     document.getElementById('postingResult').innerHTML = `<div class="alert alert-success">${result}</div>`;
                     loadFinancialSummary();
-                    setTimeout(() => document.getElementById('postingProgress').style.display = 'none', 2000);
-                    clearForm();
+                    setTimeout(() => clearForm(), 2000);
                 } else {
                     document.getElementById('postingResult').innerHTML = `<div class="alert alert-warning">${result}</div>`;
                     document.getElementById('postBtn').innerHTML = '<i class="fas fa-paper-plane"></i> Post Voucher';
                     document.getElementById('postBtn').disabled = false;
-                    document.getElementById('postingProgress').style.display = 'none';
                 }
             })
             .postVoucherToSheets();
@@ -2009,6 +2013,33 @@ function verifyLicense() {
     function refreshFinancialSummary() {
         loadFinancialSummary();
     }
+
+    // লাইসেন্স চেকের সময় অ্যাপের বাটন ও ইনপুট নিষ্ক্রিয় করতে, তবে লাইসেন্স মডালের ভেতর নয়
+function disableApp(disabled) {
+    const allButtons = document.querySelectorAll('button');
+    const allInputs = document.querySelectorAll('input, select, textarea');
+    
+    if (disabled) {
+        allButtons.forEach(btn => {
+            if (!btn.closest('#licenseModal')) {
+                btn.disabled = true;
+            }
+        });
+        allInputs.forEach(inp => {
+            if (!inp.closest('#licenseModal')) {
+                inp.disabled = true;
+            }
+        });
+        // স্পেশাল: লাইসেন্স মডালের ইনপুটকে সবসময় এনাবল রাখো
+        const licenseInput = document.getElementById('licenseKeyInput');
+        if (licenseInput) licenseInput.disabled = false;
+        const verifyBtn = document.querySelector('#licenseModal .btn-primary');
+        if (verifyBtn) verifyBtn.disabled = false;
+    } else {
+        allButtons.forEach(btn => btn.disabled = false);
+        allInputs.forEach(inp => inp.disabled = false);
+    }
+}
 </script>
 </body>
 </html>
